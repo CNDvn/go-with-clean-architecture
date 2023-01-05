@@ -2,11 +2,10 @@ package main
 
 import (
 	"log"
-	"net/http"
 	"os"
-	"strconv"
-	"strings"
 	"time"
+
+	todotrpt "go-with-clean-architecture/module/item/transport"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -47,146 +46,117 @@ func main() {
 
 	v1 := router.Group("/v1")
 	{
-		v1.POST("/items", createItem(db))           // create item
-		v1.GET("/items", getListOfItems(db))        // list items
-		v1.GET("/items/:id", readItemById(db))      // get an item by ID
-		v1.PUT("/items/:id", editItemById(db))      // edit an item by ID
-		v1.DELETE("/items/:id", deleteItemById(db)) // delete an item by ID
+		v1.POST("/items", todotrpt.HandleCreateItem(db)) // create item
+		// v1.GET("/items", getListOfItems(db))        // list items
+		// v1.GET("/items/:id", readItemById(db))      // get an item by ID
+		// v1.PUT("/items/:id", editItemById(db))      // edit an item by ID
+		// v1.DELETE("/items/:id", deleteItemById(db)) // delete an item by ID
 	}
 
 	router.Run()
 }
 
-func createItem(db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var dataItem ToDoItem
+// func readItemById(db *gorm.DB) gin.HandlerFunc {
+// 	return func(c *gin.Context) {
+// 		var dataItem ToDoItem
 
-		if err := c.ShouldBind(&dataItem); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
+// 		id, err := strconv.Atoi(c.Param("id"))
 
-		// preprocess title - trim all spaces
-		dataItem.Title = strings.TrimSpace(dataItem.Title)
+// 		if err != nil {
+// 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+// 			return
+// 		}
 
-		if dataItem.Title == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "title cannot be blank"})
-			return
-		}
+// 		if err := db.Where("id = ?", id).First(&dataItem).Error; err != nil {
+// 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+// 			return
+// 		}
 
-		// do not allow "finished" status when creating a new task
-		dataItem.Status = "Doing" // set to default
+// 		c.JSON(http.StatusOK, gin.H{"data": dataItem})
+// 	}
+// }
 
-		if err := db.Create(&dataItem).Error; err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
+// func getListOfItems(db *gorm.DB) gin.HandlerFunc {
+// 	return func(c *gin.Context) {
+// 		type DataPaging struct {
+// 			Page  int   `json:"page" form:"page"`
+// 			Limit int   `json:"limit" form:"limit"`
+// 			Total int64 `json:"total" form:"-"`
+// 		}
 
-		c.JSON(http.StatusOK, gin.H{"data": dataItem.Id})
-	}
-}
+// 		var paging DataPaging
 
-func readItemById(db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var dataItem ToDoItem
+// 		if err := c.ShouldBind(&paging); err != nil {
+// 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+// 			return
+// 		}
 
-		id, err := strconv.Atoi(c.Param("id"))
+// 		if paging.Page <= 0 {
+// 			paging.Page = 1
+// 		}
 
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
+// 		if paging.Limit <= 0 {
+// 			paging.Limit = 10
+// 		}
 
-		if err := db.Where("id = ?", id).First(&dataItem).Error; err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-			return
-		}
+// 		offset := (paging.Page - 1) * paging.Limit
 
-		c.JSON(http.StatusOK, gin.H{"data": dataItem})
-	}
-}
+// 		var result []ToDoItem
 
-func getListOfItems(db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		type DataPaging struct {
-			Page  int   `json:"page" form:"page"`
-			Limit int   `json:"limit" form:"limit"`
-			Total int64 `json:"total" form:"-"`
-		}
+// 		if err := db.Table(ToDoItem{}.TableName()).
+// 			Count(&paging.Total).
+// 			Offset(offset).
+// 			Order("id desc").
+// 			Find(&result).Error; err != nil {
+// 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+// 			return
+// 		}
 
-		var paging DataPaging
+// 		c.JSON(http.StatusOK, gin.H{"data": result})
+// 	}
+// }
 
-		if err := c.ShouldBind(&paging); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
+// func editItemById(db *gorm.DB) gin.HandlerFunc {
+// 	return func(c *gin.Context) {
+// 		id, err := strconv.Atoi(c.Param("id"))
 
-		if paging.Page <= 0 {
-			paging.Page = 1
-		}
+// 		if err != nil {
+// 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+// 			return
+// 		}
 
-		if paging.Limit <= 0 {
-			paging.Limit = 10
-		}
+// 		var dataItem ToDoItem
 
-		offset := (paging.Page - 1) * paging.Limit
+// 		if err := c.ShouldBind(&dataItem); err != nil {
+// 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+// 			return
+// 		}
 
-		var result []ToDoItem
+// 		if err := db.Where("id = ?", id).Updates(&dataItem).Error; err != nil {
+// 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+// 			return
+// 		}
 
-		if err := db.Table(ToDoItem{}.TableName()).
-			Count(&paging.Total).
-			Offset(offset).
-			Order("id desc").
-			Find(&result).Error; err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
+// 		c.JSON(http.StatusOK, gin.H{"data": true})
+// 	}
+// }
 
-		c.JSON(http.StatusOK, gin.H{"data": result})
-	}
-}
+// func deleteItemById(db *gorm.DB) gin.HandlerFunc {
+// 	return func(c *gin.Context) {
+// 		id, err := strconv.Atoi(c.Param("id"))
 
-func editItemById(db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		id, err := strconv.Atoi(c.Param("id"))
+// 		if err != nil {
+// 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+// 			return
+// 		}
 
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
+// 		if err := db.Table(ToDoItem{}.TableName()).
+// 			Where("id = ?", id).
+// 			Delete(nil).Error; err != nil {
+// 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+// 			return
+// 		}
 
-		var dataItem ToDoItem
-
-		if err := c.ShouldBind(&dataItem); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-
-		if err := db.Where("id = ?", id).Updates(&dataItem).Error; err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{"data": true})
-	}
-}
-
-func deleteItemById(db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		id, err := strconv.Atoi(c.Param("id"))
-
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-
-		if err := db.Table(ToDoItem{}.TableName()).
-			Where("id = ?", id).
-			Delete(nil).Error; err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{"data": true})
-	}
-}
+// 		c.JSON(http.StatusOK, gin.H{"data": true})
+// 	}
+// }
